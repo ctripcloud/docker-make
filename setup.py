@@ -18,6 +18,7 @@ setup(
     version='1.0',
     author='jizhilong',
     author_email='zhilongji@gmail.com',
+    url='https://github.com/CtripCloud/docker-make',
     license='Apache',
     keywords=['docker', 'image',' build'],
     scripts=['docker-make'],
