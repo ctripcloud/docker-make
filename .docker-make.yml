@@ -1,0 +1,9 @@
+builds:
+  docker-make:
+    context: /
+    dockerfile: Dockerfile
+    repo: jizhilong/docker-make
+    push_mode: always
+    push_tag_format: "{scommitid}"
+    dockerignore:
+      - .git

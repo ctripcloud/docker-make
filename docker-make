@@ -1,0 +1,453 @@
+#!/usr/bin/env python
+import argparse
+import datetime
+import logging
+import os
+import sys
+import yaml
+import subprocess
+import tempfile
+import json
+
+import docker as _docker
+
+GIT_COMMIT_ID=''
+GIT_COMMIT_MSG=''
+GIT_TAG=''
+GIT_BRANCH=''
+
+
+docker  = _docker.client.Client(version="auto")
+
+TO_CLEAN = []
+
+LOG = None
+
+
+class DmakeError(Exception):
+    pass
+
+
+class ConfigurationError(DmakeError):
+    pass
+
+
+class ValidateError(DmakeError):
+    pass
+
+
+class DependencyError(DmakeError):
+    pass
+
+
+class BuildFailed(DmakeError):
+    pass
+
+
+class BuildUnDefined(DmakeError):
+    def __init__(self, build):
+        self.build = build
+        super(BuildUnDefined, self).__init__()
+
+
+def register_clean(filename):
+    global TO_CLEAN
+    TO_CLEAN.append(filename)
+
+
+def update_git_info():
+    global GIT_COMMIT_ID, GIT_TAG, GIT_BRANCH, GIT_COMMIT_MSG
+    GIT_COMMIT_ID = subprocess.check_output("git rev-parse HEAD",
+                                            shell=True).strip()
+    GIT_COMMIT_MSG = subprocess.check_output("git log --oneline|head -1",
+                                             shell=True).strip()
+    try:
+        GIT_BRANCH = subprocess.check_output("git rev-parse --abbrev-ref HEAD",
+                                             shell=True).strip()
+    except subprocess.CalledProcessError:
+        pass
+
+    try:
+        s = subprocess.check_output("git show-ref --tags -d",
+                                    shell=True)
+        matched = next((l for l in s.split('\n')
+                        if l.startswith(GIT_COMMIT_ID)), None)
+        if matched:
+            GIT_TAG = matched.split(' ', 1)[-1].replace('refs/tags/', '').\
+                    replace('^{}', '').strip()
+    except subprocess.CalledProcessError:
+        pass
+
+
+def load_yaml(filename='.docker-make.yml'):
+    try:
+        with open(filename) as f:
+            return yaml.safe_load(f)
+    except (IOError, yaml.YAMLError) as e:
+        err_msg = getattr(e, '__module__', '') + '.' + e.__class__.__name__
+        raise ConfigurationError(u"{}: {}".format(err_msg, e))
+
+
+def validate(config):
+    builds = config.get('builds')
+    if builds is None:
+        raise ValidateError("no builds specified")
+    if not isinstance(builds, dict):
+        raise ValidateError("builds should be a dict")
+
+    for name, build in builds.iteritems():
+        for dep in build.get('depends_on', []):
+            if dep not in builds:
+                raise ValidateError("%s depends on %s,"
+            "which is not present in the current configuration." % (name, dep))
+    return True
+
+
+def tag_elements():
+    ret = dict(
+        date=datetime.datetime.now().strftime("%Y%m%d"),
+        fcommitid=GIT_COMMIT_ID,
+        scommitid=GIT_COMMIT_ID[:7],
+        )
+    if GIT_TAG:
+        ret['git_tag'] = GIT_TAG
+    if GIT_BRANCH:
+        ret['git_branch'] = GIT_BRANCH
+    return ret
+
+
+def sort_builds_dict(builds):
+    # Topological sort (Cormen/Tarjan algorithm)
+    unmarked = builds.keys()
+    temporary_marked = set()
+    sorted_builds = []
+
+    def visit(n):
+        if n in temporary_marked:
+            if n in builds[n].get('depends_on', []):
+                raise DependencyError('A build can not'
+                                      ' depend on itself: %s' % n['name'])
+            raise DependencyError('Circular dependency between %s' %
+                                  ' and '.join(temporary_marked))
+
+        if n in unmarked:
+            temporary_marked.add(n)
+            builds_dep_on_n = [name for name, build in builds.iteritems()
+                               if 
+                               n in build.get('depends_on', [])
+                              ]
+            for m in builds_dep_on_n:
+                visit(m)
+            temporary_marked.remove(n)
+            unmarked.remove(n)
+            sorted_builds.insert(0, n)
+
+    while unmarked:
+        visit(unmarked[-1])
+
+    return sorted_builds
+
+
+class Build(object):
+    def __init__(self, name, context, dockerfile, push_mode, repo=None,
+                 dockerignore=None, labels=None, depends_on=None,
+                 build_tag_format="{date}-{scommitid}", extract=None,
+                 push_tag_format="{date}-{scommitid}", rewrite_from=None):
+        self.name = name
+        self.context = os.path.join(os.getcwd(), context.lstrip('/'))
+        self.dockerfile = dockerfile
+        self.push_mode = push_mode
+        self.repo = repo
+        self.dockerignore = dockerignore or []
+        if '.dockerignore' not in self.dockerignore:
+            self.dockerignore.append('.dockerignore')
+        self.depends_on = depends_on or []
+        self.rewrite_from = rewrite_from
+        self.build_tag_format = build_tag_format
+        self.push_tag_format = push_tag_format
+
+        self.collect_labels(labels)
+        self.parse_extract(extract)
+        self._update_progress("ready to go")
+
+    def collect_labels(self, labels=None):
+        self.labels = labels or []
+        self.labels.append('com.dockermake.git.commitid="%s"' % GIT_COMMIT_ID)
+        self.labels.append('com.dockermake.git.commitmsg="%s"' % GIT_COMMIT_MSG)
+        if GIT_BRANCH:
+            self.labels.append('com.dockermake.git.branch="%s"' % GIT_BRANCH)
+        if GIT_TAG:
+            self.labels.append('com.dockermake.git.tag="%s"' % GIT_TAG)
+
+    def parse_extract(self, extract=None):
+        extract = extract or []
+        self.extract = []
+        for item in extract:
+            src, dst = item.split(':', 1)
+            self.extract.append({
+                'src': src,
+                'dst': os.path.join(self.context, dst)
+            })
+
+    @property
+    def build_tag(self):
+        return self.build_tag_format.format(**tag_elements())
+
+    @property
+    def push_tag(self):
+        return self.push_tag_format.format(**tag_elements())
+
+    def dryrun(self):
+        command = ["docker", "build", "-f", self.dockerfile]
+        if self.repo:
+            command.extend(["-t", "%s:%s" % (self.repo, self.build_tag)])
+        for label in self.labels:
+            command.extend(["--label", label])
+        print "%s: %s" % (self.name, " ".join(command))
+
+    def build(self):
+        self._update_progress("building")
+        self.intermediate_image = self._build()
+        if self.repo:
+            self._update_progress("attaching labels")
+            self.final_image = self._attach_labels()
+        result = self.final_image if self.repo else self.intermediate_image
+        self._update_progress("build succeed: %s" % result)
+
+        if self.extract:
+            self._update_progress("extracting archives")
+            self._extract_contents(result, self.extract)
+            self._update_progress("extracting archives succeed")
+
+    def push(self):
+        if not self.need_push():
+            return
+
+        latest_tag = "latest"
+        docker.tag(self.final_image, self.repo, latest_tag, force=True)
+        docker.tag(self.final_image, self.repo, self.push_tag, force=True)
+        self._update_progress("pushing to %s:%s" % (self.repo, self.push_tag))
+        self._do_push(self.repo, self.push_tag)
+        self._update_progress("pushed to %s:%s" % (self.repo, self.push_tag))
+        self._update_progress("pushing to %s:%s" % (self.repo, latest_tag))
+        self._do_push(self.repo, latest_tag)
+        self._update_progress("pushed to %s:%s" % (self.repo, latest_tag))
+
+    def need_push(self):
+        return {
+            'always': True,
+            'never': False,
+            'on_tag': GIT_TAG or False,
+            'on_branch:{0}'.format(GIT_BRANCH): True
+        }.get(self.push_mode, False)
+
+    def _update_progress(self, progress):
+        self.progress = progress
+        LOG.info("%s: %s" % (self.name, progress))
+
+    def _extract_contents(self, img, paths):
+        temp_container = docker.create_container(img, 'true')
+        assert 'Id' in temp_container
+        try:
+            for path in paths:
+                src, dst = path['src'], path['dst']
+                stream, stat = docker.get_archive(temp_container, src)
+                with open(dst, 'w') as f:
+                    f.write(stream.data)
+                register_clean(dst)
+        finally:
+            docker.remove_container(temp_container)
+
+    def _build(self):
+        dockerfile = os.path.join(self.context, self.dockerfile)
+        dockerignore = os.path.join(self.context, '.dockerignore')
+        created_dockerignore = False
+        if not os.path.exists(dockerignore):
+            with open(dockerignore, 'w') as f:
+                f.write("\n".join(self.dockerignore))
+                created_dockerignore = True
+            register_clean(dockerignore)
+
+        if self.rewrite_from:
+            original_lines = open(dockerfile).readlines()
+            with open(dockerfile, 'w') as f:
+                f.write("FROM %s\n" % self.rewrite_from)
+                if original_lines[0].startswith('FROM'):
+                    f.write(''.join(original_lines[1:]))
+                else:
+                    f.write(''.join(original_lines))
+
+        params = {
+            'path': self.context,
+            'dockerfile': self.dockerfile,
+        }
+
+        try:
+            image_id = self._do_build(params)
+        finally:
+            if created_dockerignore:
+                os.remove(dockerignore)
+            if self.rewrite_from:
+                with open(dockerfile, 'w') as f:
+                    f.write(''.join(original_lines))
+        return image_id
+
+    def _attach_labels(self):
+        pfile = tempfile.NamedTemporaryFile()
+        pfile.write("FROM %s\n" % self.intermediate_image)
+        pfile.write("LABEL %s" % " ".join(self.labels))
+        pfile.seek(0)
+
+        params = {
+            'fileobj': pfile,
+            'tag': '%s:%s' % (self.repo, self.build_tag)
+        }
+
+        try:
+            image_id = self._do_build(params)
+        finally:
+            pfile.close()
+        return image_id
+
+    def _do_build(self, params):
+        response = docker.build(**params)
+        image_id = None
+        for line in response:
+            ret = json.loads(line)
+            if 'stream' in ret:
+                msg = ret['stream']
+                LOG.debug("%s: %s" % (self.name, msg))
+            if 'errorDetail' in ret:
+                raise BuildFailed(ret['errorDetail']['message'])
+            if 'Successfully built' in ret.get('stream', ''):
+                image_id = ret['stream'].strip().split()[-1]
+        return image_id
+
+    def _do_push(self, repo, tag):
+        response = docker.push(repo, tag, stream=True)
+        for line in response:
+            LOG.debug("%s: %s" % (self.name, line))
+            info = json.loads(line)
+            if 'errorDetail' in line:
+                raise DmakeError("error in push %s:%s: %s" % (repo, tag, line))
+
+    def __repr__(self):
+        return "Build: %s(%s)" % (self.name, self.progress)
+
+
+def argparser():
+    parser = argparse.ArgumentParser(description=
+                                     "build docker images in a simpler way.")
+    parser.add_argument('builds', type=str, nargs='*',
+                        help='builds to execute.')
+    parser.add_argument('-f', '--file', dest='dmakefile',
+                        default='.docker-make.yml',
+                        help='path to docker-make configuration file.')
+    parser.add_argument('-d', '--detailed', default=False,
+                        action='store_true', help='print out detailed logs')
+    parser.add_argument('--dry-run', dest='dryrun', action='store_true',
+                        default=False, help='print docker commands only')
+    parser.add_argument('--no-push', dest='nopush', action='store_true',
+                        default=False, help='build only, dont push images.')
+    return parser
+
+
+def expand_wants(candidates, wants):
+    ret = set()
+    wants = set(wants)
+    while wants:
+        want = wants.pop()
+        if want not in candidates:
+            raise BuildUnDefined(want)
+        ret.add(want)
+        for dep in candidates[want].depends_on:
+            if dep not in ret:
+                wants.add(dep)
+    return ret
+
+
+def main():
+    global LOG
+
+    parser = argparser()
+    args = parser.parse_args()
+
+    log_format = '%(levelname)s %(asctime)s %(filename)s(%(lineno)s) %(msg)s'
+    log_level = logging.DEBUG if args.detailed else logging.INFO
+    logging.basicConfig(format=log_format, level=log_level)
+    LOG = logging.getLogger("docker-make")
+
+    try:
+        update_git_info()
+    except Exception:
+        LOG.exception("failed to extract information from git, "
+                      "make you are in a git repo and have git installed")
+        return 1
+
+    try:
+        config = load_yaml(args.dmakefile)
+        validate(config)
+    except ConfigurationError as e:
+        LOG.error("failed to parse %s: %s" % (args.docker-makefile, e.message))
+        return 1
+    except ValidateError as e:
+        LOG.error("wrong configuration: %s" % e.message)
+
+
+    builds_dict = config['builds']
+    builds = {}
+    try:
+        builds_order = sort_builds_dict(builds_dict)
+    except DependencyError as e:
+        LOG.eror(e.message)
+
+    for name in builds_order:
+        builds[name] = Build(name=name, **builds_dict[name])
+
+    if args.builds:
+        try:
+            wants = expand_wants(builds, args.builds)
+        except BuildUnDefined as e:
+            LOG.error("No such build:  %s" % e.build)
+            return 1
+    else:
+        wants = set(builds_order)
+
+    if args.dryrun:
+        for name in builds_order:
+            if name not in wants:
+                continue
+            build = builds[name]
+            build.dryrun()
+        return
+
+    for name in builds_order:
+        if name not in wants:
+            continue
+        build = builds[name]
+        if build.rewrite_from:
+            build.rewrite_from = builds[build.rewrite_from].final_image
+        try:
+            build.build()
+        except Exception:
+            LOG.exception("failed to build %s" % build.name)
+            return 1
+        if not args.nopush:
+            try:
+                build.push()
+            except Exception:
+                LOG.exception("failed to oush %s" % build.name)
+                return 1
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    finally:
+        for filename in TO_CLEAN:
+            if not os.path.exists(filename):
+                continue
+            if os.path.isfile(filename) or os.path.islink(filename):
+                os.remove(filename)
+            if os.path.isdir(filename):
+                os.rmdir(filename)
