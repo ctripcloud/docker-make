@@ -3,7 +3,7 @@ builds:
     context: /
     dockerfile: Dockerfile
     repo: jizhilong/docker-make
-    push_mode: always
-    push_tag_format: "{scommitid}"
+    push_mode: on_tag
+    push_tag_format: "{git_tag}"
     dockerignore:
       - .git
