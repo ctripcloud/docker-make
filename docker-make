@@ -234,7 +234,7 @@ class Build(object):
 
         if self.extract:
             self._update_progress("extracting archives")
-            self._extract_contents(result, self.extract)
+            self._extract_contents(self.final_image, self.extract)
             self._update_progress("extracting archives succeed")
 
     def tag(self):
