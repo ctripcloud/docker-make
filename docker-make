@@ -120,6 +120,12 @@ def tag_elements():
     return ret
 
 
+def label_elements():
+    ret = tag_elements()
+    ret.pop('date', None)
+    return ret
+
+
 def sort_builds_dict(builds):
     # Topological sort (Cormen/Tarjan algorithm)
     unmarked = builds.keys()
@@ -193,13 +199,19 @@ class Build(object):
                 raise ConfigurationError("wrong format for push %s" % line)
 
     def collect_labels(self, labels=None):
-        self.labels = labels or []
-        self.labels.append('com.dockermake.git.commitid="%s"' % GIT_COMMIT_ID)
-        self.labels.append('com.dockermake.git.commitmsg="%s"' % GIT_COMMIT_MSG)
-        if GIT_BRANCH:
-            self.labels.append('com.dockermake.git.branch="%s"' % GIT_BRANCH)
-        if GIT_TAG:
-            self.labels.append('com.dockermake.git.tag="%s"' % GIT_TAG)
+        self.labels = []
+        labels = labels or []
+        elements = label_elements()
+        for label_template in labels:
+            try:
+                key, value = label_template.split('=', 1)
+                value = label_template.format(**elements)
+                value = value.replace('"', r'\"')
+                self.append('%s="%s"' % (key, value))
+            except KeyError:
+                LOG.warn('invalid label template: %s' % label_template)
+            except ValueError:
+                raise ConfigurationError("invalid label template: %s" % label_template)
 
     def parse_extract(self, extract=None):
         extract = extract or []
@@ -242,10 +254,11 @@ class Build(object):
             self._update_progress("extracting archives succeed")
 
     def tag(self):
+        elements = tag_elements()
         for push_mode, repo, tag_format in self.pushes:
             need_push = self.need_push(push_mode)
             try:
-                tag_name = self.get_tag(tag_foramt)
+                tag_name = tag_format.format(**elements)
                 docker.tag(self.final_image, repo, tag_format)
             except KeyError as e:
                 if need_push:
@@ -253,10 +266,11 @@ class Build(object):
                 tag_name = None
 
     def push(self):
+        elements = tag_elements()
         for push_mode, repo, tag_format in self.pushes:
             need_push = self.need_push(push_mode)
             try:
-                tag_name = self.get_tag(tag_format)
+                tag_name = tag_format.format(**elements)
             except KeyError as e:
                 if need_push:
                     raise PushFailed("can not get tag name for tag_format: %s" %
