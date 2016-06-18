@@ -85,19 +85,19 @@ Dockerfile for the build.
 ## `pushes` (optional, [string], default: [])
 pushing rule for the built image, a single rule is composed as '<push_mode>:<repo>:<tag_template>',
 in which:
-* `push\_mode` defines when to push, choices include:
+* `push_mode` defines when to push, choices include:
   * `always`: always push the successfully built image.
-  * `on\_tag`: push if built on a git tag.
-  * `on\_branch:<branchname>`: push if built on branch `branchname`
+  * `on_tag`: push if built on a git tag.
+  * `on_branch:<branchname>`: push if built on branch `branchname`
 
 * `repo` defines which repo to push to.
 
-* `tag\_template` is a python template string for generating the image tag, available template variables include:
+* `tag_template` is a python template string for generating the image tag, available template variables include:
   * `date`: date of the built(e.g, 20160617)
   * `scommitid`: a 7-char trunc of the corresponding git sha-1 commit id.
   * `fcommitid`: full git commit id.
-  * `git\_tag`: git tag name (if built on a git tag)
-  * `git\_branch`: git branch name(if built on a git branch)
+  * `git_tag`: git tag name (if built on a git tag)
+  * `git_branch`: git branch name(if built on a git branch)
 
 ## `dockerignore` (optional, [string], default: [])
 ref: [dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
@@ -107,14 +107,14 @@ define labels applied to built image, each item should be with format '<key>="<v
 being a python template string, available template variables include:
 * `scommitid`: a 7-char trunc of the corresponding git sha-1 commit id.
 * `fcommitid`: full git commit id.
-* `git\_tag`: git tag name (if built on a git tag)
-* `git\_branch`: git branch name(if built on a git branch)
+* `git_tag`: git tag name (if built on a git tag)
+* `git_branch`: git branch name(if built on a git branch)
 
-## `depends\_on` (optional, [string], default: [])
+## `depends_on` (optional, [string], default: [])
 which builds this build depends on, `docker-make` will do the depends first.
 
 ## `extract` (optional, [string], default: [])
 define a list of source-destination pairs, with `source` point to a path of the newly built image, and `destination` being a filename on the host, `docker-make` will package `source` in a tar file, and copy the tar file to `destination`. Each item's syntax is similar to `docker run -v`
 
-## `rewrite\_from`, (optional, string, default: '')
-a build's name which should be available in `.docker-make.yml`, if supplied, `docker-make` will build `rewrite\_from` first, and replace current build's Dockerfile's `FROM` with `rewrite\_from`'s fresh image id.
+## `rewrite_from`, (optional, string, default: '')
+a build's name which should be available in `.docker-make.yml`, if supplied, `docker-make` will build `rewrite_from` first, and replace current build's Dockerfile's `FROM` with `rewrite_from`'s fresh image id.
