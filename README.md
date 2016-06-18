@@ -23,6 +23,17 @@ pip install docker-make
 docker-make --no-push
 ``` 
 
+if all goes well, the logs would look like:
+
+```
+INFO 2016-06-19 01:21:49,513 docker-make(277) docker-make: building
+INFO 2016-06-19 01:21:49,657 docker-make(277) docker-make: attaching labels
+INFO 2016-06-19 01:21:49,748 docker-make(277) docker-make: label added: com.dockermake.git.commitid="3d97f0fc382e1f90f77584bbc8193509b835fce0"
+INFO 2016-06-19 01:21:49,748 docker-make(277) docker-make: build succeed: c4391b6110f6
+INFO 2016-06-19 01:21:49,756 docker-make(277) docker-make: tag added: jizhilong/docker-make:3d97f0fc382e1f90f77584bbc8193509b835fce0
+INFO 2016-06-19 01:21:49,760 docker-make(277) docker-make: tag added: jizhilong/docker-make:latest
+```
+
 # how it works
 docker-make read and parse `.docker-make.yml`(configurable via command line) in the root of a git repo,
 in which you spcify images to build, each build's Dockerfile, context, repo to push, rules for tagging, dependencies, etc.
