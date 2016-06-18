@@ -174,7 +174,6 @@ class Build(object):
         self.collect_pushes(pushes)
         self.collect_labels(labels)
         self.parse_extract(extract)
-        self._update_progress("ready to go")
 
     def collect_pushes(self, pushes):
         self.pushes = []
@@ -182,7 +181,7 @@ class Build(object):
 
         for line in push_rules:
             try:
-                push_mode, line = line.split(':', 1)
+                push_mode, line = line.split('=', 1)
                 repo, tag_template = line.rsplit(':', 1)
                 self.pushes.append((push_mode, repo, tag_template))
             except ValueError:
@@ -195,9 +194,9 @@ class Build(object):
         for label_template in labels:
             try:
                 key, value = label_template.split('=', 1)
-                value = label_template.format(**elements)
+                value = value.format(**elements)
                 value = value.replace('"', r'\"')
-                self.append('%s="%s"' % (key, value))
+                self.labels.append('%s="%s"' % (key, value))
             except KeyError:
                 LOG.warn('invalid label template: %s' % label_template)
             except ValueError:
@@ -231,7 +230,7 @@ class Build(object):
             self.final_image = self._attach_labels()
         else:
             self.final_image = self.intermediate_image
-        self._update_progress("build succeed: %s" % result)
+        self._update_progress("build succeed: %s" % self.final_image)
 
         if self.extract:
             self._update_progress("extracting archives")
@@ -244,11 +243,11 @@ class Build(object):
             need_push = self.need_push(push_mode)
             try:
                 tag_name = tag_template.format(**elements)
-                docker.tag(self.final_image, repo, tag_template)
+                docker.tag(self.final_image, repo, tag_name)
+                self._update_progress("tag added: %s:%s" % (repo, tag_name))
             except KeyError as e:
                 if need_push:
                     LOG.warn('invalid tag_template for this build: %s' % e.message)
-                tag_name = None
 
     def push(self):
         elements = tag_elements()
@@ -338,6 +337,8 @@ class Build(object):
             image_id = self._do_build(params)
         finally:
             pfile.close()
+        for label in self.labels:
+            self._update_progress("label added: %s" % label)
         return image_id
 
     def _do_build(self, params):
