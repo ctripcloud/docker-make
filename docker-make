@@ -159,23 +159,17 @@ def sort_builds_dict(builds):
 
 
 class Build(object):
-    def __init__(self, name, context, dockerfile, push_mode='never', repo=None,
+    def __init__(self, name, context, dockerfile,
                  dockerignore=None, labels=None, depends_on=None,
-                 build_tag_format="{date}-{scommitid}", extract=None,
-                 push_tag_format="{date}-{scommitid}", pushes=None,
-                 rewrite_from=None):
+                 extract=None, pushes=None, rewrite_from=None):
         self.name = name
         self.context = os.path.join(os.getcwd(), context.lstrip('/'))
         self.dockerfile = dockerfile
-        self.push_mode = push_mode
-        self.repo = repo
         self.dockerignore = dockerignore or []
         if '.dockerignore' not in self.dockerignore:
             self.dockerignore.append('.dockerignore')
         self.depends_on = depends_on or []
         self.rewrite_from = rewrite_from
-        self.build_tag_format = build_tag_format
-        self.push_tag_format = push_tag_format
 
         self.collect_pushes(pushes)
         self.collect_labels(labels)
@@ -185,16 +179,12 @@ class Build(object):
     def collect_pushes(self, pushes):
         self.pushes = []
         push_rules = pushes or []
-        # backward compatibility
-        if pushes is None and self.repo is not None\
-           and self.push_mode is not 'never':
-            pushes.append((self.push_mode, self.repo, self.push_tag_format))
 
         for line in push_rules:
             try:
                 push_mode, line = line.split(':', 1)
-                repo, tag_format = line.rsplit(':', 1)
-                self.pushes.append((push_mode, repo, tag_format))
+                repo, tag_template = line.rsplit(':', 1)
+                self.pushes.append((push_mode, repo, tag_template))
             except ValueError:
                 raise ConfigurationError("wrong format for push %s" % line)
 
@@ -226,13 +216,8 @@ class Build(object):
                 'dst': os.path.join(self.context, dst)
             })
 
-    def get_tag(self, format):
-        return format.format(**tag_elements())
-
     def dryrun(self):
         command = ["docker", "build", "-f", self.dockerfile]
-        if self.repo:
-            command.extend(["-t", "%s:%s" % (self.repo, self.build_tag)])
         for label in self.labels:
             command.extend(["--label", label])
         print "%s: %s" % (self.name, " ".join(command))
@@ -255,26 +240,26 @@ class Build(object):
 
     def tag(self):
         elements = tag_elements()
-        for push_mode, repo, tag_format in self.pushes:
+        for push_mode, repo, tag_template in self.pushes:
             need_push = self.need_push(push_mode)
             try:
-                tag_name = tag_format.format(**elements)
-                docker.tag(self.final_image, repo, tag_format)
+                tag_name = tag_template.format(**elements)
+                docker.tag(self.final_image, repo, tag_template)
             except KeyError as e:
                 if need_push:
-                    LOG.warn('invalid tag_format for this build: %s' % e.message)
+                    LOG.warn('invalid tag_template for this build: %s' % e.message)
                 tag_name = None
 
     def push(self):
         elements = tag_elements()
-        for push_mode, repo, tag_format in self.pushes:
+        for push_mode, repo, tag_template in self.pushes:
             need_push = self.need_push(push_mode)
             try:
-                tag_name = tag_format.format(**elements)
+                tag_name = tag_template.format(**elements)
             except KeyError as e:
                 if need_push:
-                    raise PushFailed("can not get tag name for tag_format: %s" %
-                                     tag_format)
+                    raise PushFailed("can not get tag name for tag_template: %s" %
+                                     tag_template)
 
             self._update_progress("pushing to %s:%s" % (repo, tag_name))
             self._do_push(repo, tag_name)
