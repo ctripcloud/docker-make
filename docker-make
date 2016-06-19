@@ -259,6 +259,7 @@ class Build(object):
                 if need_push:
                     raise PushFailed("can not get tag name for tag_template: %s" %
                                      tag_template)
+                continue
 
             self._update_progress("pushing to %s:%s" % (repo, tag_name))
             self._do_push(repo, tag_name)
