@@ -2,8 +2,11 @@ builds:
   docker-make:
     context: /
     dockerfile: Dockerfile
-    repo: jizhilong/docker-make
-    push_mode: on_tag
-    push_tag_format: "{git_tag}"
+    pushes:
+      - 'always=jizhilong/docker-make:{fcommitid}'
+      - 'on_tag=jizhilong/docker-make:{git_tag}'
+      - 'on_branch:master=jizhilong/docker-make:latest'
+    labels:
+      - 'com.dockermake.git.commitid={fcommitid}'
     dockerignore:
       - .git

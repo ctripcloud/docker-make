@@ -44,6 +44,10 @@ class BuildFailed(DmakeError):
     pass
 
 
+class PushFailed(DmakeError):
+    pass
+
+
 class BuildUnDefined(DmakeError):
     def __init__(self, build):
         self.build = build
@@ -116,6 +120,12 @@ def tag_elements():
     return ret
 
 
+def label_elements():
+    ret = tag_elements()
+    ret.pop('date', None)
+    return ret
+
+
 def sort_builds_dict(builds):
     # Topological sort (Cormen/Tarjan algorithm)
     unmarked = builds.keys()
@@ -149,58 +159,64 @@ def sort_builds_dict(builds):
 
 
 class Build(object):
-    def __init__(self, name, context, dockerfile, push_mode, repo=None,
+    def __init__(self, name, context, dockerfile,
                  dockerignore=None, labels=None, depends_on=None,
-                 build_tag_format="{date}-{scommitid}", extract=None,
-                 push_tag_format="{date}-{scommitid}", rewrite_from=None):
+                 extract=None, pushes=None, rewrite_from=None):
         self.name = name
         self.context = os.path.join(os.getcwd(), context.lstrip('/'))
         self.dockerfile = dockerfile
-        self.push_mode = push_mode
-        self.repo = repo
         self.dockerignore = dockerignore or []
         if '.dockerignore' not in self.dockerignore:
             self.dockerignore.append('.dockerignore')
         self.depends_on = depends_on or []
         self.rewrite_from = rewrite_from
-        self.build_tag_format = build_tag_format
-        self.push_tag_format = push_tag_format
 
+        self.collect_pushes(pushes)
         self.collect_labels(labels)
         self.parse_extract(extract)
-        self._update_progress("ready to go")
+
+    def collect_pushes(self, pushes):
+        self.pushes = []
+        push_rules = pushes or []
+
+        for line in push_rules:
+            try:
+                push_mode, line = line.split('=', 1)
+                repo, tag_template = line.rsplit(':', 1)
+                self.pushes.append((push_mode, repo, tag_template))
+            except ValueError:
+                raise ConfigurationError("wrong format for push %s" % line)
 
     def collect_labels(self, labels=None):
-        self.labels = labels or []
-        self.labels.append('com.dockermake.git.commitid="%s"' % GIT_COMMIT_ID)
-        self.labels.append('com.dockermake.git.commitmsg="%s"' % GIT_COMMIT_MSG)
-        if GIT_BRANCH:
-            self.labels.append('com.dockermake.git.branch="%s"' % GIT_BRANCH)
-        if GIT_TAG:
-            self.labels.append('com.dockermake.git.tag="%s"' % GIT_TAG)
+        self.labels = []
+        labels = labels or []
+        elements = label_elements()
+        for label_template in labels:
+            try:
+                key, value = label_template.split('=', 1)
+                value = value.format(**elements)
+                value = value.replace('"', r'\"')
+                self.labels.append('%s="%s"' % (key, value))
+            except KeyError:
+                LOG.warn('invalid label template: %s' % label_template)
+            except ValueError:
+                raise ConfigurationError("invalid label template: %s" % label_template)
 
     def parse_extract(self, extract=None):
         extract = extract or []
         self.extract = []
         for item in extract:
-            src, dst = item.split(':', 1)
+            try:
+                src, dst = item.split(':', 1)
+            except ValueError:
+                raise ConfigurationError('invalid extract rule: %s' % item)
             self.extract.append({
                 'src': src,
                 'dst': os.path.join(self.context, dst)
             })
 
-    @property
-    def build_tag(self):
-        return self.build_tag_format.format(**tag_elements())
-
-    @property
-    def push_tag(self):
-        return self.push_tag_format.format(**tag_elements())
-
     def dryrun(self):
         command = ["docker", "build", "-f", self.dockerfile]
-        if self.repo:
-            command.extend(["-t", "%s:%s" % (self.repo, self.build_tag)])
         for label in self.labels:
             command.extend(["--label", label])
         print "%s: %s" % (self.name, " ".join(command))
@@ -208,38 +224,53 @@ class Build(object):
     def build(self):
         self._update_progress("building")
         self.intermediate_image = self._build()
-        if self.repo:
+
+        if self.labels:
             self._update_progress("attaching labels")
             self.final_image = self._attach_labels()
-        result = self.final_image if self.repo else self.intermediate_image
-        self._update_progress("build succeed: %s" % result)
+        else:
+            self.final_image = self.intermediate_image
+        self._update_progress("build succeed: %s" % self.final_image)
 
         if self.extract:
             self._update_progress("extracting archives")
-            self._extract_contents(result, self.extract)
+            self._extract_contents(self.final_image, self.extract)
             self._update_progress("extracting archives succeed")
 
+    def tag(self):
+        elements = tag_elements()
+        for push_mode, repo, tag_template in self.pushes:
+            need_push = self.need_push(push_mode)
+            try:
+                tag_name = tag_template.format(**elements)
+                docker.tag(self.final_image, repo, tag_name)
+                self._update_progress("tag added: %s:%s" % (repo, tag_name))
+            except KeyError as e:
+                if need_push:
+                    LOG.warn('invalid tag_template for this build: %s' % e.message)
+
     def push(self):
-        if not self.need_push():
-            return
+        elements = tag_elements()
+        for push_mode, repo, tag_template in self.pushes:
+            need_push = self.need_push(push_mode)
+            try:
+                tag_name = tag_template.format(**elements)
+            except KeyError as e:
+                if need_push:
+                    raise PushFailed("can not get tag name for tag_template: %s" %
+                                     tag_template)
 
-        latest_tag = "latest"
-        docker.tag(self.final_image, self.repo, latest_tag, force=True)
-        docker.tag(self.final_image, self.repo, self.push_tag, force=True)
-        self._update_progress("pushing to %s:%s" % (self.repo, self.push_tag))
-        self._do_push(self.repo, self.push_tag)
-        self._update_progress("pushed to %s:%s" % (self.repo, self.push_tag))
-        self._update_progress("pushing to %s:%s" % (self.repo, latest_tag))
-        self._do_push(self.repo, latest_tag)
-        self._update_progress("pushed to %s:%s" % (self.repo, latest_tag))
+            self._update_progress("pushing to %s:%s" % (repo, tag_name))
+            self._do_push(repo, tag_name)
+            self._update_progress("pushed to %s:%s" % (repo, tag_name))
 
-    def need_push(self):
+    def need_push(self, push_mode):
         return {
             'always': True,
             'never': False,
             'on_tag': GIT_TAG or False,
             'on_branch:{0}'.format(GIT_BRANCH): True
-        }.get(self.push_mode, False)
+        }.get(push_mode, False)
 
     def _update_progress(self, progress):
         self.progress = progress
@@ -300,13 +331,14 @@ class Build(object):
 
         params = {
             'fileobj': pfile,
-            'tag': '%s:%s' % (self.repo, self.build_tag)
         }
 
         try:
             image_id = self._do_build(params)
         finally:
             pfile.close()
+        for label in self.labels:
+            self._update_progress("label added: %s" % label)
         return image_id
 
     def _do_build(self, params):
@@ -329,7 +361,7 @@ class Build(object):
             LOG.debug("%s: %s" % (self.name, line))
             info = json.loads(line)
             if 'errorDetail' in line:
-                raise DmakeError("error in push %s:%s: %s" % (repo, tag, line))
+                raise PushFailed("error in push %s:%s: %s" % (repo, tag, line))
 
     def __repr__(self):
         return "Build: %s(%s)" % (self.name, self.progress)
@@ -429,14 +461,22 @@ def main():
             build.rewrite_from = builds[build.rewrite_from].final_image
         try:
             build.build()
+            build.tag()
+        except BuildFailed as e:
+            LOG.error("failed to build %s: %s" % (build.name, e.message))
+            return 1
         except Exception:
             LOG.exception("failed to build %s" % build.name)
             return 1
+
         if not args.nopush:
             try:
                 build.push()
-            except Exception:
-                LOG.exception("failed to oush %s" % build.name)
+            except PushFailed as e:
+                LOG.error("failed to push %s: %s" % (build.name, e.message))
+                return 1
+            except Exception as e:
+                LOG.exception("failed to push %s" % build.name)
                 return 1
 
 
