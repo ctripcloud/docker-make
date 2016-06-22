@@ -223,13 +223,13 @@ class Build(object):
 
     def build(self):
         self._update_progress("building")
-        self.intermediate_image = self._build()
+        self.non_labeled_image = self._build()
 
         if self.labels:
             self._update_progress("attaching labels")
             self.final_image = self._attach_labels()
         else:
-            self.final_image = self.intermediate_image
+            self.final_image = self.non_labeled_image
         self._update_progress("build succeed: %s" % self.final_image)
 
         if self.extract:
@@ -326,7 +326,7 @@ class Build(object):
 
     def _attach_labels(self):
         pfile = tempfile.NamedTemporaryFile()
-        pfile.write("FROM %s\n" % self.intermediate_image)
+        pfile.write("FROM %s\n" % self.non_labeled_image)
         pfile.write("LABEL %s" % " ".join(self.labels))
         pfile.seek(0)
 
@@ -459,7 +459,7 @@ def main():
             continue
         build = builds[name]
         if build.rewrite_from:
-            build.rewrite_from = builds[build.rewrite_from].final_image
+            build.rewrite_from = builds[build.rewrite_from].non_labeled_image
         try:
             build.build()
             build.tag()
