@@ -5,7 +5,7 @@ from distutils.core import setup
 setup(
     name='docker-make',
     description='a tool for simplifying docker image building and pushing',
-    version='1.1.1',
+    version='1.1.2',
     author='jizhilong',
     author_email='zhilongji@gmail.com',
     url='https://github.com/CtripCloud/docker-make',
