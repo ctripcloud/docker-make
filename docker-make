@@ -10,6 +10,7 @@ import tempfile
 import json
 
 import docker as _docker
+from docker import utils as docker_utils
 
 GIT_COMMIT_ID=''
 GIT_COMMIT_MSG=''
@@ -243,7 +244,10 @@ class Build(object):
             need_push = self.need_push(push_mode)
             try:
                 tag_name = tag_template.format(**elements)
-                docker.tag(self.final_image, repo, tag_name)
+                kwargs = {}
+                if docker_utils.compare_version('1.22', docker._version) < 0:
+                    kwargs['force'] = True
+                docker.tag(self.final_image, repo, tag_name, **kwargs)
                 self._update_progress("tag added: %s:%s" % (repo, tag_name))
             except KeyError as e:
                 if need_push:
