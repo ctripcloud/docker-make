@@ -7,6 +7,6 @@ builds:
       - 'on_tag=jizhilong/docker-make:{git_tag}'
       - 'on_branch:master=jizhilong/docker-make:latest'
     labels:
-      - 'com.dockermake.git.commitid={fcommitid}'
+      - 'com.dockermake.git.describe={git_describe}'
     dockerignore:
       - .git
