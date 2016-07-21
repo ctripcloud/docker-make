@@ -4,4 +4,6 @@ MAINTAINER zlji <zlji@ctrip.com>
 ADD requirements.pip /tmp/
 RUN pip install -r /tmp/requirements.pip
 
-ADD docker-make /usr/bin/docker-make
+ADD . /usr/local/src/docker-make
+
+RUN pip install /usr/local/src/docker-make

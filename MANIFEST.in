@@ -1,0 +1,2 @@
+include requirements.pip test-requirements.pip
+exclude tests
