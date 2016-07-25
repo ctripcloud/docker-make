@@ -1,0 +1,7 @@
+language: python
+python:
+  - "2.7"
+install: "pip install -r requirements.pip -r test-requirements.pip"
+script:
+  - flake8 dmake/
+  - nosetests tests/

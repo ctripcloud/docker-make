@@ -9,6 +9,7 @@ from dmake.errors import *  # noqa
 
 
 LOG = logging.getLogger(__name__)
+_docker = None
 
 
 class _GarbageCleaner(object):
@@ -34,8 +35,7 @@ class _GarbageCleaner(object):
 GarbageCleaner = _GarbageCleaner()
 
 
-_docker = None
-def docker_client():  # noqa
+def docker_client():
     global _docker
     if _docker is None:
         params = docker_utils.kwargs_from_env()
@@ -63,8 +63,8 @@ def validate(config):
     for name, build in builds.iteritems():
         for dep in build.get('depends_on', []):
             if dep not in builds:
-                raise ValidateError("%s depends on %s,"
-            "which is not present in the current configuration." % (name, dep))
+                raise ValidateError("%s depends on %s, which is not present in"
+                                    "the current configuration." % (name, dep))
     return True
 
 
@@ -85,9 +85,8 @@ def sort_builds_dict(builds):
         if n in unmarked:
             temporary_marked.add(n)
             builds_dep_on_n = [name for name, build in builds.iteritems()
-                               if 
-                               n in build.get('depends_on', [])
-                              ]
+                               if
+                               n in build.get('depends_on', [])]
             for m in builds_dep_on_n:
                 visit(m)
             temporary_marked.remove(n)
@@ -103,9 +102,10 @@ def sort_builds_dict(builds):
 def get_sorted_build_dicts_from_yaml(filename):
     config = load_yaml(filename)
     validate(config)
-    builds= config["builds"]
+    builds = config["builds"]
     builds_order = sort_builds_dict(builds)
     return builds_order, builds
+
 
 def expand_wants(candidates, wants):
     ret = set()

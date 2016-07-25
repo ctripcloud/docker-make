@@ -1,15 +1,16 @@
 import argparse
 import logging
 
-from dmake.errors import *
+from dmake.errors import *  # noqa
 from dmake import utils
 import dmake.build
 
-LOG=logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
+
 
 def argparser():
-    parser = argparse.ArgumentParser(description=
-                                     "build docker images in a simpler way.")
+    parser = argparse.ArgumentParser(description="build docker images"
+                                     " in a simpler way.")
     parser.add_argument('builds', type=str, nargs='*',
                         help='builds to execute.')
     parser.add_argument('-f', '--file', dest='dmakefile',

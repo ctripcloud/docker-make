@@ -3,7 +3,9 @@ import logging
 import subprocess
 
 
-LOG=logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
+_tag_template_args = None
+_label_template_args = None
 
 
 class TemplateArgsGenerator(object):
@@ -70,7 +72,6 @@ def _template_args(generators):
     return dict((k, v) for g in generators for k, v in g.gen_args())
 
 
-_tag_template_args = None
 def tag_template_args(extra_generators=None):
     global _tag_template_args
     if _tag_template_args is not None:
@@ -84,7 +85,6 @@ def tag_template_args(extra_generators=None):
     return _tag_template_args
 
 
-_label_template_args = None
 def label_template_args(extra_generators=None):
     global _label_template_args
     if _label_template_args is not None:
