@@ -7,7 +7,7 @@ from docker import utils as docker_utils
 
 from dmake import utils
 from dmake import template_args
-from dmake.errors import *
+from dmake.errors import *  # noqa
 
 
 LOG = logging.getLogger(__name__)
@@ -59,7 +59,8 @@ class Build(object):
             except KeyError:
                 LOG.warn('invalid label template: %s' % label_template)
             except ValueError:
-                raise ConfigurationError("invalid label template: %s" % label_template)
+                raise ConfigurationError("invalid label template: %s" %
+                                         label_template)
 
     def parse_extract(self, extract=None):
         extract = extract or []
@@ -97,29 +98,32 @@ class Build(object):
             self._update_progress("extracting archives succeed")
 
     def tag(self):
+        template_kwargs = template_args.tag_template_args()
         for push_mode, repo, tag_template in self.pushes:
             need_push = self.need_push(push_mode)
             try:
-                tag_name = tag_template.format(**template_args.tag_template_args())
+                tag_name = tag_template.format(**template_kwargs)
                 kwargs = {}
-                if docker_utils.compare_version('1.22', self.docker._version) < 0:
+                if docker_utils.compare_version('1.22',
+                                                self.docker._version) < 0:
                     kwargs['force'] = True
                 self.docker.tag(self.final_image, repo, tag_name, **kwargs)
                 self._update_progress("tag added: %s:%s" % (repo, tag_name))
             except KeyError as e:
                 if need_push:
-                    LOG.warn('invalid tag_template for this build: %s' % e.message)
+                    LOG.warn('invalid tag_template for this build: %s' %
+                             e.message)
 
     def push(self):
-        elements = template_args.tag_template_args()
+        template_kwargs = template_args.tag_template_args()
         for push_mode, repo, tag_template in self.pushes:
             need_push = self.need_push(push_mode)
             try:
-                tag_name = tag_template.format(**elements)
-            except KeyError as e:
+                tag_name = tag_template.format(**template_kwargs)
+            except KeyError:
                 if need_push:
-                    raise PushFailed("can not get tag name for tag_template: %s" %
-                                     tag_template)
+                    raise PushFailed("can not get tag name for"
+                                     "tag_template: %s" % tag_template)
                 continue
 
             self._update_progress("pushing to %s:%s" % (repo, tag_name))
@@ -223,12 +227,8 @@ class Build(object):
         response = self.docker.push(repo, tag, stream=True)
         for line in response:
             LOG.debug("%s: %s" % (self.name, line))
-            info = json.loads(line)
             if 'errorDetail' in line:
                 raise PushFailed("error in push %s:%s: %s" % (repo, tag, line))
 
     def __repr__(self):
         return "Build: %s(%s)" % (self.name, self.progress)
-
-
-

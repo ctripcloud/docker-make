@@ -1,4 +1,6 @@
-# docker-make: simplify builds of related docker images.
+# docker-make
+[![Build Status](https://travis-ci.org/CtripCloud/docker-make.svg?branch=master)](https://travis-ci.org/CtripCloud/docker-make) [![Docker Pulls](https://img.shields.io/docker/pulls/jizhilong/docker-make.svg?maxAge=2592000)]()
+
 `docker-make` is a command line tool inspired by [docker-compose](https://www.docker.com/products/docker-compose), while `docker-compose`
 focus on managing the lifecycle of a bunch of related docker containers, `docker-make` aimes at simplify and automate the procedure of
 building,tagging,and pusing a bunch of related docker images.
