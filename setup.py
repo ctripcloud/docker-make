@@ -15,7 +15,7 @@ def find_requirements(fn):
 setup(
     name='docker-make',
     description='build,tag,and push a bunch of related docker images via a single command',
-    version='1.1.3',
+    version='1.1.4',
     author='jizhilong',
     author_email='zhilongji@gmail.com',
     url='https://github.com/CtripCloud/docker-make',
