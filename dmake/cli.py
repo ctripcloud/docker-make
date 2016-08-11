@@ -25,7 +25,7 @@ def argparser():
     return parser
 
 
-def main():
+def _main():
     global LOG
 
     parser = argparser()
@@ -96,9 +96,9 @@ def main():
                 LOG.exception("failed to push %s" % build.name)
                 return 1
 
-if __name__ == '__main__':
-    import sys
+
+def main():
     try:
-        sys.exit(main())
+        return _main()
     finally:
         utils.GarbageCleaner.clean_all()
