@@ -40,7 +40,7 @@ class ExternalCmdGenerator(TemplateArgsGenerator):
             # having 0 tags is not worthy of warning
             if isinstance(self, GitDescribeGenerator) and "No names found" in e.output:
                 log_level = logging.INFO
-            LOG.log(log_level, "failed to run %s: %s (%s)", self.cmd, e, e.output.strip())
+            LOG.log(log_level, "failed to run %s: %s", self.cmd, e)
             pass
 
 
