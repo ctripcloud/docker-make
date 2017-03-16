@@ -28,13 +28,20 @@ class ExternalCmdGenerator(TemplateArgsGenerator):
     def gen_args(self):
         try:
             value = subprocess.check_output(self.cmd,
+                                            stderr=subprocess.STDOUT,
                                             shell=not isinstance(self.cmd,
                                                                  list))
             value = value.strip()
             if value:
                 yield self.key, value.strip()
         except subprocess.CalledProcessError as e:
-            LOG.warn("failed to run %s: %s", self.cmd, e)
+            log_level = logging.WARNING
+
+            # having 0 tags is not worthy of warning
+            if (isinstance(self, GitDescribeGenerator) and
+                    "No names found" in e.output):
+                log_level = logging.INFO
+            LOG.log(log_level, "failed to run %s: %s", self.cmd, e)
             pass
 
 
