@@ -170,11 +170,12 @@ class Build(object):
         if self.rewrite_from:
             original_lines = open(dockerfile).readlines()
             with open(dockerfile, 'w') as f:
-                f.write("FROM %s\n" % self.rewrite_from)
-                if original_lines[0].startswith('FROM'):
-                    f.write(''.join(original_lines[1:]))
-                else:
-                    f.write(''.join(original_lines))
+                for line in original_lines:
+                    line = line.strip()
+                    if line.startswith('FROM'):
+                        f.write("FROM %s\n" % self.rewrite_from)
+                    else:
+                        f.write("%s\n" % line)
 
         params = {
             'path': self.context,
