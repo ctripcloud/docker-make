@@ -41,7 +41,7 @@ def docker_client():
     if _docker is None:
         params = docker_utils.kwargs_from_env()
         params['version'] = 'auto'
-        _docker = docker.client.Client(**params)
+        _docker = docker.api.client.APIClient(**params)
     return _docker
 
 

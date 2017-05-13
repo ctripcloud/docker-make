@@ -213,15 +213,16 @@ class Build(object):
     def _do_build(self, params):
         response = self.docker.build(**params)
         image_id = None
-        for line in response:
-            ret = json.loads(line)
-            if 'stream' in ret:
-                msg = ret['stream']
-                LOG.debug("%s: %s" % (self.name, msg))
-            if 'errorDetail' in ret:
-                raise BuildFailed(ret['errorDetail']['message'])
-            if 'Successfully built' in ret.get('stream', ''):
-                image_id = ret['stream'].strip().split()[-1]
+        for data in response:
+            for line in data.splitlines():
+                ret = json.loads(line)
+                if 'stream' in ret:
+                    msg = ret['stream']
+                    LOG.debug("%s: %s" % (self.name, msg))
+                if 'errorDetail' in ret:
+                    raise BuildFailed(ret['errorDetail']['message'])
+                if 'Successfully built' in ret.get('stream', ''):
+                    image_id = ret['stream'].strip().split()[-1]
         return image_id
 
     def _do_push(self, repo, tag):
