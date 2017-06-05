@@ -3,6 +3,7 @@ import logging
 
 import yaml
 import docker
+from distutils.version import LooseVersion
 from docker import utils as docker_utils
 
 from dmake.errors import *  # noqa
@@ -41,7 +42,10 @@ def docker_client():
     if _docker is None:
         params = docker_utils.kwargs_from_env()
         params['version'] = 'auto'
-        _docker = docker.api.client.APIClient(**params)
+        if LooseVersion(docker.__version__) < LooseVersion('2.0.0'):
+            _docker = docker.client.Client(**params)
+        else:
+            _docker = docker.api.client.APIClient(**params)
     return _docker
 
 
