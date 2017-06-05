@@ -1,2 +1,2 @@
 PyYAML >= 3.10, < 4
-docker >= 2.1.0, < 3
+# 'docker-py >= 1.8.1, < 2' or 'docker >= 2.0.0, < 3'
