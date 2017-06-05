@@ -1,4 +1,10 @@
 builds:
+  test:
+    context: /
+    dockerfile: Dockerfile.test
+    dockerignore:
+      - .git
+
   docker-make:
     context: /
     dockerfile: Dockerfile
