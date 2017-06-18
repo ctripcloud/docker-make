@@ -59,7 +59,7 @@ INFO 2016-06-19 01:21:49,760 docker-make(277) docker-make: tag added: jizhilong/
 
 ## how it works
 docker-make read and parse `.docker-make.yml`(configurable via command line) in the root of a git repo,
-in which you spcify images to build, each build's Dockerfile, context, repo to push, rules for tagging, dependencies, etc.
+in which you specify images to build, each build's Dockerfile, context, repo to push, rules for tagging, dependencies, etc.
 
 With information parsed from `.docker-make.yml`, `docker-make` will build, tag, push images in a appropriate order with
 regarding to dependency relations.
@@ -245,7 +245,7 @@ optional arguments:
 
 ## .docker-make.yml
 
-### builds(rservered keyword)
+### builds(reserved keyword)
 `builds` is a reserved a keyword for docker-make, you should define your builds under this section.
 
 ### `dwait` and `dresponse` (essential, string)
