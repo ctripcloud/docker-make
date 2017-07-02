@@ -16,7 +16,7 @@ LOG = logging.getLogger(__name__)
 class Build(object):
     def __init__(self, name, context, dockerfile,
                  dockerignore=None, labels=None, depends_on=None,
-                 extract=None, pushes=None, rewrite_from=None):
+                 extract=None, pushes=None, rewrite_from=None, remove_intermediate=None):
         self.name = name
         self.context = os.path.join(os.getcwd(), context.lstrip('/'))
         self.dockerfile = dockerfile
@@ -25,6 +25,7 @@ class Build(object):
             self.dockerignore.append('.dockerignore')
         self.depends_on = depends_on or []
         self.rewrite_from = rewrite_from
+        self.remove_intermediate = remove_intermediate
 
         self.collect_pushes(pushes)
         self.collect_labels(labels)
@@ -182,6 +183,10 @@ class Build(object):
             'dockerfile': self.dockerfile,
         }
 
+        if self.remove_intermediate:
+            LOG.debug("Removing intermediate containers after each build")
+            params['rm'] = self.remove_intermediate
+
         try:
             image_id = self._do_build(params)
         finally:
@@ -201,6 +206,10 @@ class Build(object):
         params = {
             'fileobj': pfile,
         }
+
+        if self.remove_intermediate:
+            LOG.debug("Removing intermediate containers after each build")
+            params['rm'] = self.remove_intermediate
 
         try:
             image_id = self._do_build(params)
