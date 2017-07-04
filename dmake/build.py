@@ -16,7 +16,8 @@ LOG = logging.getLogger(__name__)
 class Build(object):
     def __init__(self, name, context, dockerfile,
                  dockerignore=None, labels=None, depends_on=None,
-                 extract=None, pushes=None, rewrite_from=None, remove_intermediate=None):
+                 extract=None, pushes=None, rewrite_from=None,
+                 remove_intermediate=None):
         self.name = name
         self.context = os.path.join(os.getcwd(), context.lstrip('/'))
         self.dockerfile = dockerfile

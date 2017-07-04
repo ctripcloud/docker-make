@@ -19,7 +19,8 @@ def argparser():
     parser.add_argument('-d', '--detailed', default=False,
                         action='store_true', help='print out detailed logs')
     parser.add_argument('-rm', '--remove', default=False,
-                        action='store_true', help='remove intermediate containers')
+                        action='store_true',
+                        help='remove intermediate containers')
     parser.add_argument('--dry-run', dest='dryrun', action='store_true',
                         default=False, help='print docker commands only')
     parser.add_argument('--no-push', dest='nopush', action='store_true',
