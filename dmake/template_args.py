@@ -2,6 +2,8 @@ import datetime
 import logging
 import subprocess
 
+from dmake import utils
+
 
 LOG = logging.getLogger(__name__)
 _tag_template_args = None
@@ -15,9 +17,18 @@ class TemplateArgsGenerator(object):
         yield
 
 
-class DateGenerator(TemplateArgsGenerator):
+class DateTimeGenerator(TemplateArgsGenerator):
+    def __init__(self, name, format):
+        self.name = name
+        self.format = format
+
     def gen_args(self):
-        yield 'date', datetime.datetime.now().strftime("%Y%m%d")
+        yield self.name, datetime.datetime.now().strftime(self.format)
+
+
+class DateGenerator(DateTimeGenerator):
+    def __init__(self):
+        super(DateGenerator, self).__init__('date', '%Y%m%d')
 
 
 class ExternalCmdGenerator(TemplateArgsGenerator):
@@ -103,3 +114,40 @@ def label_template_args(extra_generators=None):
     generators.extend(extra_generators)
     _label_template_args = _template_args(generators)
     return _label_template_args
+
+
+def init_tag_names(dmakefile):
+    data = utils.load_yaml(dmakefile)
+    configurations = data.get('tag-names', None)
+    extra_generators = create_extra_generators(configurations)
+    label_template_args(extra_generators)
+    tag_template_args(extra_generators)
+
+
+def create_extra_generators(configurations):
+    if configurations is None:
+        return []
+
+    configurable_tag_name_generators = {
+        'datetime': DateTimeGenerator,
+        'cmd': ExternalCmdGenerator
+    }
+
+    tag_name_generators = []
+
+    for config in configurations:
+        if not validate_tag_name_config(config):
+            continue
+        name, type_, value = config['name'], config['type'], config['value']
+        cls = configurable_tag_name_generators.get(type_, None)
+        if cls is not None:
+            tag_name_generators.append(cls(name, value))
+    return tag_name_generators
+
+
+def validate_tag_name_config(config):
+    for key in ('name', 'type', 'value'):
+        if key not in config:
+            LOG.warn("%s absent in %s", key, config)
+            return False
+    return True

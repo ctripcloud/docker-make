@@ -18,6 +18,17 @@ class TemplateArgsGeneratorTests(unittest2.TestCase):
         self.assertEqual(v, '20160721')
         mocked_datetime.now.assert_called_once()
 
+    @mock.patch('datetime.datetime')
+    def test_datetime_generator(self, mocked_datetime):
+        mocked_datetime.now.return_value = datetime(2016, 7, 21, 12, 23)
+        args_date = next(template_args.DateTimeGenerator(
+            'datetime', '%Y%m%d%H%M').gen_args(), None)
+        self.assertIsInstance(args_date, tuple)
+        k, v = args_date
+        self.assertEqual(k, 'datetime')
+        self.assertEqual(v, '201607211223')
+        mocked_datetime.now.assert_called_once()
+
 
 class ExternalCmdGeneratorTests(unittest2.TestCase):
 
@@ -139,3 +150,60 @@ class ArgsExportingFunctionTests(unittest2.TestCase):
         for obj, cls in zip(mocked__template_args.call_args[0][0],
                             generator_classes):
             self.assertIsInstance(obj, cls)
+
+    def test_validate_tag_name_config(self):
+        func = template_args.validate_tag_name_config
+        self.assertTrue(func({
+            'type': 'cmd',
+            'name': 'dummy',
+            'value': 'echo dummt',
+        }))
+        self.assertFalse(func({
+            'name': 'dummy',
+            'value': 'echo dummt',
+        }))
+        self.assertFalse(func({
+            'type': 'cmd',
+            'value': 'echo dummt',
+        }))
+        self.assertFalse(func({
+            'type': 'cmd',
+            'name': 'dummy',
+        }))
+        self.assertFalse(func({
+        }))
+
+    def test_create_extra_generators(self):
+        configurations = [
+            {'type': 'cmd',
+             'name': 'dummy',
+             'value': 'echo dummt'},
+        ]
+        result = template_args.create_extra_generators(configurations)
+        self.assertEqual(1, len(result))
+        self.assertIsInstance(result[0],
+                              template_args.ExternalCmdGenerator)
+        configurations = [
+            {'type': 'datetime',
+             'name': 'time',
+             'value': '%H%M'},
+            {'type': 'notexist',
+             'name': 'dummy',
+             'value': 'dummy'}
+        ]
+        result = template_args.create_extra_generators(configurations)
+        self.assertEqual(1, len(result))
+        self.assertIsInstance(result[0],
+                              template_args.DateTimeGenerator)
+
+    @mock.patch('dmake.utils.load_yaml')
+    @mock.patch('dmake.template_args.label_template_args')
+    @mock.patch('dmake.template_args.tag_template_args')
+    def test_init_tag_names(self, patched_tag_template_args,
+                                  patched_label_template_args,
+                                  patched_load_yaml):
+        patched_load_yaml.return_value = {'tag-names': []}
+        template_args.init_tag_names('.docker-make.yml')
+        patched_load_yaml.assert_called_once_with('.docker-make.yml')
+        patched_label_template_args.assert_called_once_with([])
+        patched_tag_template_args.assert_called_once_with([])
