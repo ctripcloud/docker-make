@@ -226,7 +226,7 @@ With java and php as the base images, a java app and a php app are built.
 
 ```bash
 $ docker-make --help
-usage: docker-make [-h] [-f DMAKEFILE] [-d] [--dry-run] [--no-push]
+usage: docker-make [-h] [-f DMAKEFILE] [-d] [-rm] [--dry-run] [--no-push]
                    [builds [builds ...]]
 
 build docker images in a simpler way.
@@ -239,6 +239,7 @@ optional arguments:
   -f DMAKEFILE, --file DMAKEFILE
                         path to docker-make configuration file.
   -d, --detailed        print out detailed logs
+  -rm, --remove         remove intermediate containers
   --dry-run             print docker commands only
   --no-push             build only, dont push
 ```
