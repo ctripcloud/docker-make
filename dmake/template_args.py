@@ -1,3 +1,4 @@
+import re
 import datetime
 import logging
 import subprocess
@@ -6,6 +7,9 @@ from dmake import utils
 
 
 LOG = logging.getLogger(__name__)
+TAG_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_][]a-zA-Z0-9_\.\-]{0,127}$')
+TAG_NAME_LEAD_PATTERN = re.compile(r'^[a-zA-Z0-9_]$')
+TAG_NAME_ELEMENT_PATTERN = re.compile(r'^[a-zA-Z0-9_\.\-]$')
 _tag_template_args = None
 _label_template_args = None
 
@@ -87,7 +91,39 @@ class GitDescribeGenerator(ExternalCmdGenerator):
 
 
 def _template_args(generators):
-    return dict((k, v) for g in generators for k, v in g.gen_args())
+    result = {}
+    for g in generators:
+        for k, v in g.gen_args():
+            if not validate_tag_name(v):
+                result[k] = correct_tag_name(v)
+                LOG.warn("%s is not a valid docker tag name,"
+                         "will be automatically corrected to %s",
+                         v, result[k])
+            else:
+                result[k] = v
+    return result
+
+
+def validate_tag_name(name):
+    return TAG_NAME_PATTERN.match(name) is not None
+
+
+def correct_tag_name(name):
+    if not name:
+        return "null"
+    tmp_lst = []
+    lead, suffix = name[0], name[1:]
+    if TAG_NAME_LEAD_PATTERN.match(lead) is None:
+        tmp_lst.append('_')
+    else:
+        tmp_lst.append(lead)
+
+    for c in suffix:
+        if TAG_NAME_ELEMENT_PATTERN.match(c) is None:
+            tmp_lst.append('_')
+        else:
+            tmp_lst.append(c)
+    return ''.join(tmp_lst)[:128]
 
 
 def tag_template_args(extra_generators=None):
