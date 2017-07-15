@@ -29,6 +29,24 @@ class TemplateArgsGeneratorTests(unittest2.TestCase):
         self.assertEqual(v, '201607211223')
         mocked_datetime.now.assert_called_once()
 
+    def test_validate_tag_name(self):
+        self.assertTrue(template_args.validate_tag_name('v1.0.0'))
+        self.assertTrue(template_args.validate_tag_name('latest'))
+        self.assertFalse(template_args.validate_tag_name('feature/123'))
+        self.assertFalse(template_args.validate_tag_name('-master'))
+        self.assertFalse(template_args.validate_tag_name('.test'))
+
+    def test_correct_tag_name(self):
+        self.assertEqual(template_args.correct_tag_name('feature/123'),
+                         'feature_123')
+        self.assertEqual(template_args.correct_tag_name('-master'),
+                         '_master')
+        self.assertEqual(template_args.correct_tag_name('.test'),
+                         '_test')
+        long_tag_name = ''.join(str(i) for i in xrange(128))
+        self.assertEqual(len(template_args.correct_tag_name(long_tag_name)),
+                         128)
+
 
 class ExternalCmdGeneratorTests(unittest2.TestCase):
 
