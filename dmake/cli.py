@@ -3,6 +3,7 @@ import logging
 
 from dmake.errors import *  # noqa
 from dmake import utils
+from dmake import template_args
 import dmake.build
 
 LOG = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ def _main():
     LOG = logging.getLogger("docker-make")
 
     try:
+        template_args.init_tag_names(args.dmakefile)
         builds_order, builds_dict = utils.get_sorted_build_dicts_from_yaml(
             args.dmakefile)
     except ConfigurationError as e:
