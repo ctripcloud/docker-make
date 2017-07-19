@@ -13,7 +13,7 @@ type of the new customized tag which produces a tag name based on the value of `
 
 ### `value` (essential, string)
 argument passed to the tag name generator specified by the `type` field:
-* for `datetime` type, value is a Python datetime formatter, e.g '%Y%m%d%H%M'.
+* for `datetime` type, value is a Python datetime formatter, e.g '%Y%m%d%H%M'(ref [datetime.strftime](https://docs.python.org/2/library/datetime.html#strftime-and-strptime-behavior)).
 * for `cmd` type, value is a shell command, e.g. `echo hello-world`.
 
 
