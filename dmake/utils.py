@@ -21,7 +21,7 @@ class _GarbageCleaner(object):
         self._files.add(filename)
 
     def clean(self, filename):
-        LOG.debug("cleaning up %s" % filename)
+        LOG.debug("cleaning up %s", filename)
         if not os.path.exists(filename):
             return
         if os.path.isfile(filename) or os.path.islink(filename):

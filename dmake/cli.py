@@ -35,7 +35,7 @@ def _main():
     parser = argparser()
     args = parser.parse_args()
 
-    log_format = '%(levelname)s %(name)s(%(lineno)s) %(asctime)s %(msg)s'
+    log_format = '%(levelname)s %(name)s(%(lineno)s) %(asctime)s %(message)s'
     log_level = logging.DEBUG if args.detailed else logging.INFO
     logging.basicConfig(format=log_format, level=log_level)
     LOG = logging.getLogger("docker-make")
@@ -45,10 +45,10 @@ def _main():
         builds_order, builds_dict = utils.get_sorted_build_dicts_from_yaml(
             args.dmakefile)
     except ConfigurationError as e:
-        LOG.error("failed to parse %s: %s" % (args.dmakefile, e.message))
+        LOG.error("failed to parse %s: %s", args.dmakefile, e.message)
         return 1
     except ValidateError as e:
-        LOG.error("wrong configuration: %s" % e.message)
+        LOG.error("wrong configuration: %s", e.message)
         return 1
     except DmakeError as e:
         LOG.eror(e.message)
@@ -64,7 +64,7 @@ def _main():
         try:
             wants = utils.expand_wants(builds, args.builds)
         except BuildUnDefined as e:
-            LOG.error("No such build:  %s" % e.build)
+            LOG.error("No such build:  %s", e.build)
             return 1
     else:
         wants = set(builds_order)
@@ -87,20 +87,20 @@ def _main():
             build.build()
             build.tag()
         except BuildFailed as e:
-            LOG.error("failed to build %s: %s" % (build.name, e.message))
+            LOG.error("failed to build %s: %s", build.name, e.message)
             return 1
         except Exception:
-            LOG.exception("failed to build %s" % build.name)
+            LOG.exception("failed to build %s", build.name)
             return 1
 
         if not args.nopush:
             try:
                 build.push()
             except PushFailed as e:
-                LOG.error("failed to push %s: %s" % (build.name, e.message))
+                LOG.error("failed to push %s: %s", build.name, e.message)
                 return 1
             except Exception as e:
-                LOG.exception("failed to push %s" % build.name)
+                LOG.exception("failed to push %s", build.name)
                 return 1
 
 

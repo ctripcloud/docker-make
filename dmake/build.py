@@ -59,7 +59,7 @@ class Build(object):
                 value = value.replace('"', r'\"')
                 self.labels.append('%s="%s"' % (key, value))
             except KeyError:
-                LOG.warn('invalid label template: %s' % label_template)
+                LOG.warn('invalid label template: %s', label_template)
             except ValueError:
                 raise ConfigurationError("invalid label template: %s" %
                                          label_template)
@@ -113,7 +113,7 @@ class Build(object):
                 self._update_progress("tag added: %s:%s" % (repo, tag_name))
             except KeyError as e:
                 if need_push:
-                    LOG.warn('invalid tag_template for this build: %s' %
+                    LOG.warn('invalid tag_template for this build: %s',
                              e.message)
 
     def push(self):
@@ -144,7 +144,7 @@ class Build(object):
 
     def _update_progress(self, progress):
         self.progress = progress
-        LOG.info("%s: %s" % (self.name, progress))
+        LOG.info("%s: %s", self.name, progress)
 
     def _extract_contents(self, img, paths):
         temp_container = self.docker.create_container(img, 'true')
@@ -228,7 +228,7 @@ class Build(object):
                 ret = json.loads(line)
                 if 'stream' in ret:
                     msg = ret['stream']
-                    LOG.debug("%s: %s" % (self.name, msg))
+                    LOG.debug("%s: %s", self.name, msg)
                 if 'errorDetail' in ret:
                     raise BuildFailed(ret['errorDetail']['message'])
                 if 'Successfully built' in ret.get('stream', ''):
@@ -238,7 +238,7 @@ class Build(object):
     def _do_push(self, repo, tag):
         response = self.docker.push(repo, tag, stream=True)
         for line in response:
-            LOG.debug("%s: %s" % (self.name, line))
+            LOG.debug("%s: %s", self.name, line)
             if 'errorDetail' in line:
                 raise PushFailed("error in push %s:%s: %s" % (repo, tag, line))
 
