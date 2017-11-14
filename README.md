@@ -29,13 +29,26 @@ pip install docker-make
 ### install via alias to docker run
 or you can just execute it with a `docker run` command, and for convenience, you can set an alias:
 
+#### unixy
+
 ```bash
-alias docker-make="docker run --rm -w /usr/src/app\\
-                                   -v ~/.docker:/root/.docker\\
-                                   -v /var/run/docker.sock:/var/run/docker.sock\\
-                                   -v \"\$(pwd)\":/usr/src/app jizhilong/docker-make docker-make"
+alias docker-make="docker run --rm -w /usr/src/app \
+                                   -v ~/.docker:/root/.docker \
+                                   -v /var/run/docker.sock:/var/run/docker.sock \
+                                   -v "${PWD}:/usr/src/app" jizhilong/docker-make docker-make"
 ```
 
+#### windows
+
+```ps
+function docker-make {
+  docker run --rm -w /build `
+    -v "${HOME}/.docker:/root/.docker" `
+    -v /var/run/docker.sock:/var/run/docker.sock `
+    -v "${PWD}:/build" `
+    jizhilong/docker-make docker-make
+}
+```
 
 ## quickstart
 `docker-make` is a user is itself, so you can build a image for it with the following command:
