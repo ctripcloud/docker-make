@@ -15,13 +15,14 @@ LOG = logging.getLogger(__name__)
 
 class Build(object):
     def __init__(self, name, context, dockerfile,
-                 dockerignore=None, labels=None, depends_on=None,
+                 buildargs=None, dockerignore=None, labels=None, depends_on=None,
                  extract=None, pushes=None, rewrite_from=None,
                  remove_intermediate=None):
         self.name = name
         self.context = os.path.join(os.getcwd(), context.lstrip('/'))
         self.dockerfile = dockerfile
         self.dockerignore = dockerignore or []
+        self.buildargs = buildargs
         if '.dockerignore' not in self.dockerignore:
             self.dockerignore.append('.dockerignore')
         self.depends_on = depends_on or []
@@ -179,9 +180,14 @@ class Build(object):
                     else:
                         f.write("%s\n" % line)
 
+        buildargs = {}
+        if self.buildargs:
+            buildargs = {k: v for k, v in [arg.split('=') for arg in self.buildargs]}
+
         params = {
             'path': self.context,
             'dockerfile': self.dockerfile,
+            'buildargs': buildargs,
         }
 
         if self.remove_intermediate:
