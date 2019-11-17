@@ -81,7 +81,7 @@ class Build(object):
         command = ["docker", "build", "-f", self.dockerfile]
         for label in self.labels:
             command.extend(["--label", label])
-        print "%s: %s" % (self.name, " ".join(command))
+        print ("%s: %s" % (self.name, " ".join(command)))
 
     def build(self):
         self._update_progress("building")
