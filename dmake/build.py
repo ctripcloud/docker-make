@@ -175,10 +175,16 @@ class Build(object):
             with open(dockerfile, 'w') as f:
                 for line in original_lines:
                     line = line.strip()
-                    if line.startswith('FROM'):
+                    if not line.startswith("FROM"):
+                        f.write("%s\n" % line)
+                        continue
+
+                    if " AS " not in line:
                         f.write("FROM %s\n" % self.rewrite_from)
                     else:
-                        f.write("%s\n" % line)
+                        from_text, intermediate_name = line.split(" AS ")
+                        f.write("FROM %s AS %s\n" % (self.rewrite_from, intermediate_name))
+
 
         buildargs = {}
         if self.buildargs:
