@@ -4,19 +4,12 @@ tag-names:
     value: '%Y%m%d%H%M'
 
 builds:
-  test:
-    context: /
-    dockerfile: Dockerfile.test
-    dockerignore:
-      - .git
-
   docker-make:
     context: /
     dockerfile: Dockerfile
+    buildargs:
+      - 'ENV_VAR=${ENV_VAR}'
     pushes:
-      - 'always=jizhilong/docker-make:{fcommitid}'
-      - 'always=jizhilong/docker-make:{datetime}'
-      - 'on_tag=jizhilong/docker-make:{git_tag}'
       - 'on_branch:master=jizhilong/docker-make:latest'
     labels:
       - 'com.dockermake.git.describe={git_describe}'

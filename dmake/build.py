@@ -103,31 +103,33 @@ class Build(object):
     def tag(self):
         template_kwargs = template_args.tag_template_args()
         for push_mode, repo, tag_template in self.pushes:
+            # continue to next item if not needed
             need_push = self.need_push(push_mode)
+            if not need_push:
+                continue
+
             try:
                 tag_name = tag_template.format(**template_kwargs)
                 kwargs = {}
-                if docker_utils.compare_version('1.22',
-                                                self.docker._version) < 0:
+                if docker_utils.compare_version('1.22', self.docker._version) < 0:
                     kwargs['force'] = True
                 self.docker.tag(self.final_image, repo, tag_name, **kwargs)
                 self._update_progress("tag added: %s:%s" % (repo, tag_name))
             except KeyError as e:
-                if need_push:
-                    LOG.warn('invalid tag_template for this build: %s',
-                             e.message)
+                LOG.warn('invalid tag_template for this build: %s', e.message)
 
     def push(self):
         template_kwargs = template_args.tag_template_args()
         for push_mode, repo, tag_template in self.pushes:
+            # continue to next item if not needed
             need_push = self.need_push(push_mode)
+            if not need_push:
+                continue
+
             try:
                 tag_name = tag_template.format(**template_kwargs)
             except KeyError:
-                if need_push:
-                    raise PushFailed("can not get tag name for"
-                                     "tag_template: %s" % tag_template)
-                continue
+                raise PushFailed("can not get tag name for tag_template: %s" % tag_template)
 
             self._update_progress("pushing to %s:%s" % (repo, tag_name))
             self._do_push(repo, tag_name)
@@ -139,8 +141,7 @@ class Build(object):
             'always': True,
             'never': False,
             'on_tag': tag_template_args.get('git_tag', False),
-            'on_branch:{0}'.format(tag_template_args.get('git_branch',
-                                                         '9x43d83')): True
+            'on_branch:{0}'.format(tag_template_args.get('git_branch', '9x43d83')): True
         }.get(push_mode, False)
 
     def _update_progress(self, progress):

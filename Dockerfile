@@ -1,9 +1,12 @@
 FROM python:2.7.11
-MAINTAINER Ji.Zhilong <zhilongji@gmail.com>
+ARG ENV_VAR
+#MAINTAINER Ji.Zhilong <zhilongji@gmail.com>
 
-ADD requirements.pip /tmp/
-RUN pip install -r /tmp/requirements.pip
+ENV ENV_VAR=${ENV_VAR}
 
-ADD . /usr/local/src/docker-make
-
-RUN pip install /usr/local/src/docker-make
+#ADD requirements.pip /tmp/
+#RUN pip install -r /tmp/requirements.pip
+#
+#ADD . /usr/local/src/docker-make
+#
+#RUN pip install /usr/local/src/docker-make
