@@ -182,7 +182,7 @@ class Build(object):
 
         buildargs = {}
         if self.buildargs:
-            buildargs = {k: v for k, v in [arg.split('=') for arg in self.buildargs]}
+            buildargs = {k: os.path.expandvars(v) for k, v in [arg.split('=') for arg in self.buildargs]}
 
         params = {
             'path': self.context,
