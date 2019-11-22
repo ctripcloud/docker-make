@@ -1,6 +1,8 @@
 import argparse
 import logging
 
+from dotenv import load_dotenv
+
 from dmake.errors import *  # noqa
 from dmake import utils
 from dmake import template_args
@@ -39,6 +41,8 @@ def _main():
     log_level = logging.DEBUG if args.detailed else logging.INFO
     logging.basicConfig(format=log_format, level=log_level)
     LOG = logging.getLogger("docker-make")
+
+    load_dotenv()
 
     try:
         template_args.init_tag_names(args.dmakefile)

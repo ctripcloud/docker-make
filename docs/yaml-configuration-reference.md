@@ -16,7 +16,6 @@ argument passed to the tag name generator specified by the `type` field:
 * for `datetime` type, value is a Python datetime formatter, e.g '%Y%m%d%H%M'(ref [datetime.strftime](https://docs.python.org/2/library/datetime.html#strftime-and-strptime-behavior)).
 * for `cmd` type, value is a shell command, e.g. `echo hello-world`.
 
-
 ## builds(essential, dict, default: {})
 definition of `docker-builds` and their relationships.
 
@@ -29,13 +28,17 @@ path to build context, relative to the root of the repo.
 ### `dockerfile` (essential, string)
 Dockerfile for the build, relative to the context.
 
+### `buildargs` (optional, [string], default: [])
+List of build arguments. 
+Each argument should be provided in `"ARG=VALUE"` form.  
+
 ### `pushes` (optional, [string], default: [])
-pushing rule for the built image, a single rule is composed in a form of  '<push_mode>=<repo>:<tag_template>',
+pushing rule for the built image, a single rule is composed in a form of  '<push_mode>=<\repo>:<tag_template>',
 in which:
-  * `push_mode` defines when to push, choices include:
-  * `always`: always push the successfully built image.
-  * `on_tag`: push if built on a git tag.
-  * `on_branch:<branchname>`: push if built on branch `branchname`
+* `push_mode` defines when to push, choices include:
+    * `always`: always push the successfully built image.
+    * `on_tag`: push if built on a git tag.
+    * `on_branch:<branchname>`: push if built on branch `branchname`
 
 * `repo` defines which repo to push to.
 
